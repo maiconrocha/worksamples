@@ -8,11 +8,6 @@ from aws_cdk import (
 
 import os
 
-env={
-    'account': os.environ['CDK_DEFAULT_ACCOUNT'], 
-    'region': os.environ['CDK_DEFAULT_REGION']
-  }
-
 class AutoScalingStack(core.Stack):
     def __init__(self, app: core.App, id: str, **kwargs) -> None:
         super().__init__(app, id, **kwargs)
@@ -28,8 +23,6 @@ class AutoScalingStack(core.Stack):
             "ap-southeast-2": "ami-0455f9923a0d8e96f",
         })
         
-       # print (linux)
-
         asg = autoscaling.AutoScalingGroup(
             self, "MyFleet",
             instance_type=ec2.InstanceType("t2.xlarge"),
