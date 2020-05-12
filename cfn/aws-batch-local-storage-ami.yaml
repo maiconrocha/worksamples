@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Launch template to avoid creating a custom ami"
+
+Parameters:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+ 
+Resources:
+  SpecialComputeEnvironment:
+    Type: "AWS::Batch::ComputeEnvironment"
+    Properties:
+      Type: MANAGED
+      ComputeEnvironmentName: !Sub "Special-ComputeEnvironment-${AWS::Region}-1" 
+      ServiceRole: !Ref SpecialServiceRole
+      ComputeResources:
+        MaxvCpus: 256
+        SecurityGroupIds:
+          - !Ref SecurityGroup
+        Subnets: !Ref Subnets
+        Type: EC2
+        MinvCpus: 0
+        ImageId: ami-0aee8ced190c05726 
+        InstanceRole: !Ref SpecialInstanceProfile
+        InstanceTypes:
+          - r5d.xlarge
+        LaunchTemplate:
+          LaunchTemplateId: !Ref SpecialComputeLaunchTemplate
+          Version: !GetAtt SpecialComputeLaunchTemplate.LatestVersionNumber
+        DesiredvCpus: 0
+      State: ENABLED
+
+  SpecialComputeLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: "Special-inc-volume"
+      LaunchTemplateData:
+        UserData:
+         "Fn::Base64": !Sub |
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="
+
+            --==MYBOUNDARY==
+            Content-Type: text/x-shellscript; charset="us-ascii"
+
+            #!/bin/bash          
+             
+            cloud-init-per once create_fs mkfs -t xfs /dev/nvme1n1
+            cloud-init-per once mkdir_data mkdir /data
+            cloud-init-per once add_mount_entry echo "/dev/nvme1n1  /data  xfs  defaults,nofail  0  2" >> /etc/fstab
+            cloud-init-per once mount_volume mount -av
+
+            --==MYBOUNDARY==
+
+  SpecialJobDefinition:
+    Type: "AWS::Batch::JobDefinition"
+    Properties:
+      Type: container
+      Timeout:
+        AttemptDurationSeconds: 1800
+      JobDefinitionName: !Sub "Special-job-def-${AWS::Region}"
+      ContainerProperties:
+        Memory: 4000
+        Privileged: false
+        ReadonlyRootFilesystem: false
+        Vcpus: 1
+        Image: postgres
+        MountPoints:
+          - ContainerPath: "/data"
+            ReadOnly: false
+            SourceVolume: data
+        Volumes:
+          - Name: data
+            Host:
+              SourcePath: "/data"
+
+  SpecialJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref  SpecialComputeEnvironment
+      State: ENABLED
+      Priority: 1
+      JobQueueName: !Sub Special-mounttest-${AWS::Region}
+
+  SpecialServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub Special-batch-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "batch.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: ecs-instance-options-3
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecs:CreateCluster"
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:Poll"
+                  - "ecs:RegisterContainerInstance"
+                  - "ecs:StartTelemetrySession"
+                  - "ecs:UpdateContainerInstancesState"
+                  - "ecs:Submit*"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "s3:Get*"
+                  - "s3:List*"
+                Resource: "*"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  SpecialInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub Special-batch-instance-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: ecs-instance-options
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecs:CreateCluster"
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:Poll"
+                  - "ecs:RegisterContainerInstance"
+                  - "ecs:StartTelemetrySession"
+                  - "ecs:UpdateContainerInstancesState"
+                  - "ecs:Submit*"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"                  
+                  - "s3:Get*"
+                  - "s3:List*"
+                Resource: "*"
+        - PolicyName: "s3-glue-data"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:*"
+                Resource:
+                  - "*"
+
+  SpecialInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref SpecialInstanceRole
