@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  taskdefinition: 
+    Type: AWS::ECS::TaskDefinition
+    Properties: 
+      RequiresCompatibilities:
+        - "EC2"
+        - "FARGATE"
+      ExecutionRoleArn: "arn:aws:iam::XXXXXXXX:role/ecsTaskExecutionRole"
+      NetworkMode: "awsvpc"
+      Cpu: 256
+      Memory: 512
+      ContainerDefinitions:      
+        - 
+          Name: "busybox"
+          Image: "stedolan/jq"
+          EntryPoint: 
+            - "sh"
+            - "-c"
+            - "export MyPWD=$(echo ${passwordfromsm} | jq -r '.password')"
+          Secrets:
+            - Name: passwordfromsm
+              ValueFrom: !ImportValue "Secretexport"          
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: ap-southeast-2
+              awslogs-group: secretlog
+              awslogs-stream-prefix: se
