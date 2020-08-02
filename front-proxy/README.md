@@ -24,4 +24,36 @@ docker push <account id>.dkr.ecr.<region>.amazonaws.com/frontenvoy:latest
 
 5) Create Task Definitions
 
-To be Continued...
+Edit files task-definition-envoy.json and task-definition-frontproxy.json
+and specify the correct region and aws account, also the correct ARN for ECR Repository
+
+Register task definition through the console or through the CLI command:
+aws ecs register-task-definition --cli-input-json file://<path_to_json_file>/task-definition-envoy.json
+aws ecs register-task-definition --cli-input-json file://<path_to_json_file>/task-definition-frontproxy.json
+
+6) Create ECS Cluster
+
+Go to ECS Console > Create Cluster > EC2 Linux + Networking > Cluster Name: envoy, create new VPC
+
+
+7) Create ECS Services
+
+Create ECS Service serviceenvoy
+Task Definition > envoy
+Choose the VPC from the cluster
+Service discovery endpoint testservice.ecs
+DNS Record Type A
+TTL 60
+Namespace ecs (PRIVATE)
+
+Create ECS Service frontenvoy
+Task Definition > frontenvoy
+Choose the VPC from the cluster
+
+8) Test Envoy
+
+Create an EC2 instance on the same VPC than ECS Cluster
+
+$ curl (front-proxy-private-ip):80/service
+Hello from behind Envoy! 
+
