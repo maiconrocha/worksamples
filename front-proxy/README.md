@@ -35,6 +35,36 @@ aws ecs register-task-definition --cli-input-json file://<path_to_json_file>/tas
 aws ecs register-task-definition --cli-input-json file://<path_to_json_file>/task-definition-frontproxy.json
 ```
 
+Console:
+
+Create new Task Revision envoy:
+Network Mode: awsvpc
+Add Container: Container Name: Service
+Image: <aws account>.dkr.ecr.<region>.amazonaws.com/service:latest
+Memory Limits (MiB) : 128 Mb
+Port Mappings: 8080
+CPU units: 256
+Auto-configure CloudWatch Logs
+
+Add Container: Container Name: Envoy
+Image: <aws account>.dkr.ecr.<region>.amazonaws.com/envoy:latest
+Memory Limits (MiB) : 128 Mb
+Port Mappings: 80
+CPU units: 256
+Auto-configure CloudWatch Logs
+
+click on Create
+
+Create new Task Revision frontenvoy:
+Network Mode: awsvpc
+Add Container: Container Name: frontenvoy
+Image: <aws account>.dkr.ecr.<region>.amazonaws.com/frontenvoy:latest
+Memory Limits (MiB) : 128 Mb
+CPU units: 256
+Auto-configure CloudWatch Logs
+
+Click on Create
+
 ### 6) Create ECS Cluster
 
 Go to ECS Console > Create Cluster > EC2 Linux + Networking > Cluster Name: envoy, create new VPC
